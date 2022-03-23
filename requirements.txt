@@ -2,4 +2,3 @@ streamlit
 streamlit-option-menu
 matplotlib
 datetime
-sqlite3
