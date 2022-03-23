@@ -2,7 +2,6 @@ import streamlit as st
 from streamlit_option_menu import option_menu
 
 import seiten.shops as shops
-import seiten.product as product
 import seiten.home as home
 
 st.set_page_config(f'GROCERIES', layout="wide")

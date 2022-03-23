@@ -4,11 +4,12 @@ from matplotlib import pyplot as plt
 from datetime import date
 
 TODAY = date.today().strftime('%Y-%m-%d')
+DB = f'Products.db'
 
 
 def app(product: str, shop: str) -> None:
     # Database Connection
-    conn = sqlite3.connect('C:/Users/UserNA6153/PycharmProjects/GIZ_Projects/groceryscraper/Products.db')
+    conn = sqlite3.connect(DB)
     cur = conn.cursor()
 
     # Write space
