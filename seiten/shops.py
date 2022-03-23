@@ -10,7 +10,7 @@ def app(shop: str) -> None:
     # VARIABLES
     SHOP = shop
     DB = f'Products.db'
-    IMAGEFILE = f'C:/Users/UserNA6153/PycharmProjects/GIZ_Projects/grocerywebsite/{SHOP}.png'
+    IMAGEFILE = f'{SHOP}.png'
     TODAY = date.today().strftime('%Y-%m-%d')
     YESTERDAY = (datetime.now() - timedelta(1)).strftime('%Y-%m-%d')
     COLORS = ['#ff6961', '#ffb480', '#f8f38d', '#42d6a4', '#08cad1', '#59adf6', '#9d94ff', '#c780e8', '#D876AC']
