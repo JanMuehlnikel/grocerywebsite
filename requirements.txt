@@ -1,1 +1,6 @@
+streamlit
 streamlit-option-menu
+matplotlib
+datetime
+PIL
+sqlite3
