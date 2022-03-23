@@ -6,7 +6,6 @@ import seiten.home as home
 
 st.set_page_config(f'GROCERIES', layout="wide")
 
-
 def menu():
     selected = option_menu(
         menu_title=None,
