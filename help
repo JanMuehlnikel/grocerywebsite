@@ -1,0 +1,10 @@
+### HELP ###
+
+Streamlit Documentation
+https://docs.streamlit.io/
+
+Launch Website:
+streamlit run app.py
+
+Stop Server:
+strg + c
