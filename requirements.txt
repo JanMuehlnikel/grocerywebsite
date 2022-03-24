@@ -1,4 +1,6 @@
 streamlit
 streamlit-option-menu
 matplotlib
+matplotlib.dates
 datetime
+operator

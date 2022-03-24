@@ -4,7 +4,8 @@ from streamlit_option_menu import option_menu
 import seiten.shops as shops
 import seiten.home as home
 
-st.set_page_config(f'GROCERIES', layout="wide")
+# page config
+st.set_page_config(f'Dashboard', layout="wide")
 
 def menu():
     selected = option_menu(

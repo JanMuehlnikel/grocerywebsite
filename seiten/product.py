@@ -1,6 +1,7 @@
 import streamlit as st
 import sqlite3
 from matplotlib import pyplot as plt
+import matplotlib.dates
 from datetime import date
 
 TODAY = date.today().strftime('%Y-%m-%d')
@@ -43,20 +44,24 @@ def app(product: str, shop: str) -> None:
 
         # DATES
         x_axis = [
-            data[1]
+            matplotlib.dates.datestr2num(data[1])
             for data in product_data
         ]
         # PRICES
         y_axis = [
-            data[0]
+            float(data[0])
             for data in product_data
         ]
 
         # Plot line chart
         fig, ax = plt.subplots()
-        ax.plot(x_axis, y_axis, color='#ff6961')
-        ax.scatter(x_axis, y_axis, color='#ffb480')
-        plt.fill_between(x_axis, y_axis, color='#ffb480')
+
+        ax.plot(x_axis, y_axis, color='#59adf6')
+        ax.scatter(x_axis, y_axis, color='#08cad1')
+        ax.axis([None, None, 0, max(y_axis) + 1])
+
+        plt.xticks([])
+        plt.fill_between(x_axis, y_axis, color='#59adf6')
         plt.xlabel('Time')
         plt.ylabel('Price in EUR')
         clm1.pyplot(fig, transparent=True)
@@ -71,6 +76,5 @@ def app(product: str, shop: str) -> None:
         clm2.metric(f'Average', f'{round(max_min[0][2], 2)} EUR')
 
     statistics1()
-
 
 

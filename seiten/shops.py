@@ -1,9 +1,11 @@
 import streamlit as st
 from matplotlib import pyplot as plt
 from datetime import datetime, timedelta, date
-from PIL import Image
+import matplotlib.dates
 import seiten.product as product_site
+from PIL import Image
 import sqlite3
+from operator import itemgetter
 
 
 def app(shop: str) -> None:
@@ -38,11 +40,20 @@ def app(shop: str) -> None:
             cur.execute("SELECT COUNT(name) FROM aldi WHERE date = ?", (YESTERDAY,))
             number_products_yesterday = cur.fetchall()
 
+            cur.execute("SELECT price, name FROM aldi WHERE date = ?", (TODAY,))
+            prices_td = cur.fetchall()
+
+            changes = 0
+            for p in prices_td:
+                cur.execute("SELECT price FROM aldi WHERE name = ?", (p[1],))
+                prices_yd = cur.fetchall()
+                if p[0] != prices_yd[0][0]:
+                    changes += 1
 
             return [
                 number_products[0][0],
                 round(sum_price[0][0] / number_products[0][0], 2),
-                abs(number_products_yesterday[0][0] - number_products[0][0])
+                changes
             ]
 
         number_products_today = compare(TODAY)[0]
@@ -60,7 +71,7 @@ def app(shop: str) -> None:
         avg_price.metric(f'Average Price', f'{avg_price_today} EUR',
                          f'{round(((avg_price_today - avg_price_yesterday) / avg_price_yesterday) * 100, 2)} %')
 
-        change.metric(f'Price Changes', f'{changes_today} changes')
+        change.metric(f'Price Changes', f'{changes_today} changes', f'since {YESTERDAY}')
 
     def products_table():
         # Sidebar
@@ -94,8 +105,14 @@ def app(shop: str) -> None:
 
     def statistics_1():
         space, clm1, space, clm2, space = st.columns((1, 5, 1, 5, 1))
-
-        ### MAP ###
+        '''
+        with clm1:
+            ### MAP ###
+            m = leafmap.Map()
+            d = 'C:/Users/UserNA6153/QGISProjects/AldiSued/aldi_süd.csv'
+            m.add_points_from_xy(d, x="longitude", y="latitude")
+            m.to_streamlit(height=400)
+        '''
         clm1.title('Map')
         clm1.write(' ')
         image = Image.open(IMAGEFILE)
@@ -146,7 +163,7 @@ def app(shop: str) -> None:
         dates = cur.fetchall()
 
         x_axis = [
-            selected_date[0]
+            matplotlib.dates.datestr2num(selected_date[0])
             for selected_date in dates
         ]
 
@@ -154,15 +171,20 @@ def app(shop: str) -> None:
         for selected_date in dates:
             cur.execute("SELECT SUM(price), COUNT(name) FROM aldi WHERE date = ?", (selected_date[0],))
             sum_prices = cur.fetchall()
-            y_axis.append(str(round(sum_prices[0][0] / sum_prices[0][1], 2)))
+            y_axis.append(float(round(sum_prices[0][0] / sum_prices[0][1], 2)))
 
         # Plot line chart
         fig, ax = plt.subplots()
-        ax.plot(x_axis, y_axis, color='#ff6961')
+
+        ax.plot_date(x_axis, y_axis, color='#ff6961')
         ax.scatter(x_axis, y_axis, color='#ffb480')
-        plt.fill_between(x_axis, y_axis, color='#ffb480')
+        ax.axis([None, None, 0, max(y_axis) + 1])
+
+        plt.xticks([])
         plt.xlabel('Time')
         plt.ylabel('Price in EUR')
+        plt.fill_between(x_axis, y_axis, color='#ffb480')
+
         clm1.pyplot(fig, transparent=True)
 
         ### Prices and Categories ###
@@ -186,6 +208,67 @@ def app(shop: str) -> None:
         plt.xlabel('Price in EUR')
         clm2.pyplot(fig, transparent=True)
 
+    def statistics_3():
+        # products with most relative price rise and fall
+        # date to compare
+        #three_month_ago = (datetime.now() - timedelta(1)).strftime('%Y-%m-%d')
+        three_month_ago = '2022-03-23'
+
+        # DB Cnnection
+        cur.execute("SELECT price, name FROM aldi WHERE date = ?", (three_month_ago,))
+        products_then = cur.fetchall()
+
+        # Iterate through all products and select 10 with highest rise
+        rises = []
+        for product_then in products_then:
+            try:
+                cur.execute("SELECT price, image FROM aldi WHERE date = ? AND name = ?", (TODAY, product_then[1],))
+                product_today = cur.fetchall()
+
+                price_rise = round((((float(product_today[0][0]) - float(product_then[0])) / float(product_then[0])) * 100), 2)
+
+                # Price rise / Name / Price today / Price then / Image
+                rises.append([price_rise, product_then[1], product_today[0][0], product_then[0], product_today[0][1]])
+
+            except:
+                continue
+
+        top_ten_rises = sorted(rises, key=itemgetter(0))
+        space, clm1, space, clm2, space = st.columns((1, 5, 1, 5, 1))
+
+        clm1.header('Top 5 - Relative Price Rise 📈')
+        clm1.caption(f'➠ since {three_month_ago}')
+        clm2.header('Top 5 - Relative Price Fall 📉')
+        clm2.caption(f'➠ since {three_month_ago}')
+
+        for j in range(5):
+            i = -j - 1
+            space, clm1_0, clm1_1, border, clm2_0, clm2_1, space = st.columns((1, 5, 5, 1, 5, 5, 1))
+
+            ### RISES ###
+            clm1_0.write('-----------------------------------------------------------------------')
+            clm1_0.write(' ')
+            clm1_0.image(top_ten_rises[i][4], width=140)
+            clm1_1.write('-----------------------------------------------------------------------')
+            clm1_1.write(f'{top_ten_rises[i][1]}')
+            clm1_1.write(f'{top_ten_rises[i][3]}€ ➩ {top_ten_rises[i][2]}€')
+            clm1_1.markdown(f'<FONT COLOR="#ff6961"> + {top_ten_rises[i][0]} % </FONT>', unsafe_allow_html=True)
+
+            ### FALLS ###
+            j = abs(i) + 1
+            clm2_0.write('-----------------------------------------------------------------------')
+            clm2_0.write(' ')
+            clm2_0.image(top_ten_rises[j][4], width=140)
+            clm2_1.write('-----------------------------------------------------------------------')
+            clm2_1.write(f'{top_ten_rises[j][1]}')
+            clm2_1.write(f'{top_ten_rises[j][3]}€ ➩ {top_ten_rises[j][2]}€')
+            clm2_1.markdown(f'<FONT COLOR="#42d6a4"> - {top_ten_rises[j][0]} % </FONT>', unsafe_allow_html=True)
+
+            ### BORDER ###
+            for i in range(8):
+                border.markdown('┃')
+
+
     def placeholder():
         st.write(' ')
         st.write(' ')
@@ -197,7 +280,10 @@ def app(shop: str) -> None:
         data_metric()
         placeholder()
         statistics_1()
+        placeholder()
         statistics_2()
+        placeholder()
+        statistics_3()
         products_table()
 
     run()
