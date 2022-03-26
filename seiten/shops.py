@@ -37,9 +37,6 @@ def app(shop: str) -> None:
             cur.execute("SELECT SUM(price) FROM aldi WHERE date = ?", (day,))
             sum_price = cur.fetchall()
 
-            cur.execute("SELECT COUNT(name) FROM aldi WHERE date = ?", (YESTERDAY,))
-            number_products_yesterday = cur.fetchall()
-
             cur.execute("SELECT price, name FROM aldi WHERE date = ?", (TODAY,))
             prices_td = cur.fetchall()
 
@@ -66,7 +63,7 @@ def app(shop: str) -> None:
         products, avg_price, change = st.columns(3)
         products.metric(f'Number Of Products',
                         f'{number_products_today} Products',
-                        f'{round(((number_products_yesterday - number_products_today) / number_products_yesterday) * 100, 2)} %')
+                        f'{round(((number_products_today - number_products_yesterday) / number_products_yesterday) * 100, 2)} %')
 
         avg_price.metric(f'Average Price', f'{avg_price_today} EUR',
                          f'{round(((avg_price_today - avg_price_yesterday) / avg_price_yesterday) * 100, 2)} %')

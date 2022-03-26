@@ -71,9 +71,9 @@ def app(product: str, shop: str) -> None:
         max_min = cur.fetchall()
 
         # Write Metric
-        clm2.metric(f'Highest', f'{max_min[0][0]} EUR')
-        clm2.metric(f'Lowest', f'{max_min[0][1]} EUR')
-        clm2.metric(f'Average', f'{round(max_min[0][2], 2)} EUR')
+        clm2.metric(f'Highest ↗', f'{max_min[0][0]} EUR')
+        clm2.metric(f'Lowest ↘', f'{max_min[0][1]} EUR')
+        clm2.metric(f'Average ↭', f'{round(max_min[0][2], 2)} EUR')
 
     statistics1()
 
