@@ -8,7 +8,9 @@ TODAY = date.today().strftime('%Y-%m-%d')
 DB = f'Products.db'
 
 
-def app(product: str, shop: str) -> None:
+def app(product: str, shop: str, currency: str) -> None:
+    SHOP = shop
+
     # Database Connection
     conn = sqlite3.connect(DB)
     cur = conn.cursor()
@@ -27,7 +29,7 @@ def app(product: str, shop: str) -> None:
     # Write Data on Website
     clm1.image(data[0][2], width=400)
     clm2.title(data[0][0])
-    clm2.header(f'{data[0][1]}  EUR')
+    clm2.header(f'{data[0][1]}  {currency}')
     clm2.write(' ')
     clm2.write(' ')
     clm2.write(' ')
@@ -57,7 +59,6 @@ def app(product: str, shop: str) -> None:
         fig, ax = plt.subplots()
 
         ax.plot(x_axis, y_axis, color='#59adf6')
-        ax.scatter(x_axis, y_axis, color='#08cad1')
         ax.axis([None, None, 0, max(y_axis) + 1])
 
         plt.xticks([])
@@ -71,9 +72,9 @@ def app(product: str, shop: str) -> None:
         max_min = cur.fetchall()
 
         # Write Metric
-        clm2.metric(f'Highest ↗', f'{max_min[0][0]} EUR')
-        clm2.metric(f'Lowest ↘', f'{max_min[0][1]} EUR')
-        clm2.metric(f'Average ↭', f'{round(max_min[0][2], 2)} EUR')
+        clm2.metric(f'Highest ↗', f'{max_min[0][0]} {currency}')
+        clm2.metric(f'Lowest ↘', f'{max_min[0][1]} {currency}')
+        clm2.metric(f'Average ↭', f'{round(max_min[0][2], 2)} {currency}')
 
     statistics1()
 

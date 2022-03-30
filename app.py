@@ -11,7 +11,7 @@ st.set_page_config(f'Dashboard', layout="wide")
 def menu():
     selected = option_menu(
         menu_title=None,
-        options=['Home', 'Aldi', 'REWE'],
+        options=['Home', 'Aldi', "Carrefour Cote D'Ivoire"],
         icons=['house'],
         menu_icon=['cast'],
         default_index=0,
@@ -36,4 +36,6 @@ selected = menu()
 if selected == 'Home':
     home.app()
 if selected == 'Aldi':
-    shops.app('aldi')
+    shops.app('aldi', 'EUR')
+if selected == "Carrefour Cote D'Ivoire":
+    shops.app('carrefour_cote_divoire', 'CFA')

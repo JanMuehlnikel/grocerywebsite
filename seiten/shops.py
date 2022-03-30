@@ -8,10 +8,11 @@ import sqlite3
 from operator import itemgetter
 
 
-def app(shop: str) -> None:
+def app(shop: str, currency: str) -> None:
     # VARIABLES
     SHOP = shop
     DB = f'Products.db'
+    CURRENCY = currency
     IMAGEFILE = f'{SHOP}.png'
     TODAY = date.today().strftime('%Y-%m-%d')
     YESTERDAY = (datetime.now() - timedelta(1)).strftime('%Y-%m-%d')
@@ -23,7 +24,7 @@ def app(shop: str) -> None:
 
     # Category List
     CATEGORIES = []
-    cur.execute("SELECT DISTINCT category FROM aldi")
+    cur.execute(f"SELECT DISTINCT category FROM {SHOP}")
     rows = cur.fetchall()
     for row in rows:
         CATEGORIES.append(row[0])
@@ -31,27 +32,29 @@ def app(shop: str) -> None:
     def data_metric():
 
         def compare(day):
-            cur.execute("SELECT COUNT(name) FROM aldi WHERE date = ?", (day,))
+            cur.execute(f"SELECT COUNT(name) FROM {SHOP} WHERE date = ?", (day,))
             number_products = cur.fetchall()
 
-            cur.execute("SELECT SUM(price) FROM aldi WHERE date = ?", (day,))
+            cur.execute(f"SELECT SUM(price) FROM {SHOP} WHERE date = ?", (day,))
             sum_price = cur.fetchall()
 
-            cur.execute("SELECT price, name FROM aldi WHERE date = ?", (TODAY,))
+            cur.execute(f"SELECT price, name FROM {SHOP} WHERE date = ?", (TODAY,))
             prices_td = cur.fetchall()
 
             changes = 0
             for p in prices_td:
-                cur.execute("SELECT price FROM aldi WHERE name = ?", (p[1],))
+                cur.execute(f"SELECT price FROM {SHOP} WHERE name = ?", (p[1],))
                 prices_yd = cur.fetchall()
                 if p[0] != prices_yd[0][0]:
                     changes += 1
-
-            return [
-                number_products[0][0],
-                round(sum_price[0][0] / number_products[0][0], 2),
-                changes
-            ]
+            try:
+                return [
+                    number_products[0][0],
+                    round(sum_price[0][0] / number_products[0][0], 2),
+                    changes
+                ]
+            except:
+                return [1, 1, 1]
 
         number_products_today = compare(TODAY)[0]
         number_products_yesterday = compare(YESTERDAY)[0]
@@ -65,7 +68,7 @@ def app(shop: str) -> None:
                         f'{number_products_today} Products',
                         f'{round(((number_products_today - number_products_yesterday) / number_products_yesterday) * 100, 2)} %')
 
-        avg_price.metric(f'Average Price', f'{avg_price_today} EUR',
+        avg_price.metric(f'Average Price', f'{avg_price_today} {CURRENCY}',
                          f'{round(((avg_price_today - avg_price_yesterday) / avg_price_yesterday) * 100, 2)} %')
 
         change.metric(f'Price Changes', f'{changes_today} changes', f'since {YESTERDAY}')
@@ -82,7 +85,7 @@ def app(shop: str) -> None:
 
         sb_category = clm1.selectbox('Select category', CATEGORIES, index=0)
 
-        cur.execute("SELECT name, price FROM aldi WHERE category = ? AND date = ?", (sb_category, TODAY,))
+        cur.execute(f"SELECT name, price FROM {SHOP} WHERE category = ? AND date = ?", (sb_category, TODAY,))
         products = cur.fetchall()
         selection = [
             product[0]
@@ -93,7 +96,7 @@ def app(shop: str) -> None:
         sb_product = clm2.selectbox('Select a product see more information', selection, index=0, key=sb_category)
 
         if sb_product != 'show no product':
-            product_site.app(sb_product, SHOP)
+            product_site.app(sb_product, SHOP, CURRENCY)
 
         st.write(' ')
         st.write(
@@ -102,14 +105,7 @@ def app(shop: str) -> None:
 
     def statistics_1():
         space, clm1, space, clm2, space = st.columns((1, 5, 1, 5, 1))
-        '''
-        with clm1:
-            ### MAP ###
-            m = leafmap.Map()
-            d = 'C:/Users/UserNA6153/QGISProjects/AldiSued/aldi_süd.csv'
-            m.add_points_from_xy(d, x="longitude", y="latitude")
-            m.to_streamlit(height=400)
-        '''
+
         clm1.title('Map')
         clm1.write(' ')
         image = Image.open(IMAGEFILE)
@@ -126,7 +122,7 @@ def app(shop: str) -> None:
         ]
         sizes = []
         for category in CATEGORIES:
-            cur.execute("SELECT COUNT(name) FROM aldi WHERE date = ? AND category = ?", (TODAY, category,))
+            cur.execute(f"SELECT COUNT(name) FROM {SHOP} WHERE date = ? AND category = ?", (TODAY, category,))
             products_in_category = cur.fetchall()
             sizes.append(products_in_category[0][0])
 
@@ -156,7 +152,7 @@ def app(shop: str) -> None:
         clm1.title('Average Price')
         clm1.write(' ')
 
-        cur.execute("SELECT DISTINCT date FROM aldi")
+        cur.execute(f"SELECT DISTINCT date FROM {SHOP}")
         dates = cur.fetchall()
 
         x_axis = [
@@ -166,9 +162,11 @@ def app(shop: str) -> None:
 
         y_axis = []
         for selected_date in dates:
-            cur.execute("SELECT SUM(price), COUNT(name) FROM aldi WHERE date = ?", (selected_date[0],))
+            cur.execute(f"SELECT SUM(price), COUNT(name) FROM {SHOP} WHERE date = ?", (selected_date[0],))
             sum_prices = cur.fetchall()
-            y_axis.append(float(round(sum_prices[0][0] / sum_prices[0][1], 2)))
+            if sum_prices[0][0] and sum_prices[0][1] is not None:
+                y_axis.append(float(round(sum_prices[0][0] / sum_prices[0][1], 2)))
+
 
         # Plot line chart
         fig, ax = plt.subplots()
@@ -179,7 +177,7 @@ def app(shop: str) -> None:
 
         plt.xticks([])
         plt.xlabel('Time')
-        plt.ylabel('Price in EUR')
+        plt.ylabel(f'Price in {CURRENCY}')
         plt.fill_between(x_axis, y_axis, color='#ffb480')
 
         clm1.pyplot(fig, transparent=True)
@@ -190,13 +188,15 @@ def app(shop: str) -> None:
 
         y_axis = []
         for category in CATEGORIES:
-            cur.execute("SELECT SUM(price), COUNT(name) FROM aldi WHERE category = ? AND date = ?", (category, TODAY))
+            cur.execute(f"SELECT SUM(price), COUNT(name) FROM {SHOP} WHERE category = ? AND date = ?",
+                        (category, TODAY))
             prices_and_count = cur.fetchall()
 
-            y_axis.append(round(prices_and_count[0][0] / prices_and_count[0][1], 2))
+            if prices_and_count[0][0] and prices_and_count[0][1] is not None:
+                y_axis.append(round(prices_and_count[0][0] / prices_and_count[0][1], 2))
 
         fig, ax = plt.subplots()
-        ax.barh(CATEGORIES, y_axis, color=COLORS)
+        #ax.barh(CATEGORIES, y_axis, color=COLORS)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
@@ -208,21 +208,22 @@ def app(shop: str) -> None:
     def statistics_3():
         # products with most relative price rise and fall
         # date to compare
-        #three_month_ago = (datetime.now() - timedelta(1)).strftime('%Y-%m-%d')
-        three_month_ago = '2022-03-23'
+        # three_month_ago = (datetime.now() - timedelta(1)).strftime('%Y-%m-%d')
+        three_month_ago = '2022-03-28'
 
         # DB Cnnection
-        cur.execute("SELECT price, name FROM aldi WHERE date = ?", (three_month_ago,))
+        cur.execute(f"SELECT price, name FROM {SHOP} WHERE date = ?", (three_month_ago,))
         products_then = cur.fetchall()
 
         # Iterate through all products and select 10 with highest rise
         rises = []
         for product_then in products_then:
             try:
-                cur.execute("SELECT price, image FROM aldi WHERE date = ? AND name = ?", (TODAY, product_then[1],))
+                cur.execute(f"SELECT price, image FROM {SHOP} WHERE date = ? AND name = ?", (TODAY, product_then[1],))
                 product_today = cur.fetchall()
 
-                price_rise = round((((float(product_today[0][0]) - float(product_then[0])) / float(product_then[0])) * 100), 2)
+                price_rise = round(
+                    (((float(product_today[0][0]) - float(product_then[0])) / float(product_then[0])) * 100), 2)
 
                 # Price rise / Name / Price today / Price then / Image
                 rises.append([price_rise, product_then[1], product_today[0][0], product_then[0], product_today[0][1]])
@@ -248,7 +249,7 @@ def app(shop: str) -> None:
             clm1_0.image(top_ten_rises[i][4], width=140)
             clm1_1.write('-----------------------------------------------------------------------')
             clm1_1.write(f'{top_ten_rises[i][1]}')
-            clm1_1.write(f'{top_ten_rises[i][3]}€ ➩ {top_ten_rises[i][2]}€')
+            clm1_1.write(f'{top_ten_rises[i][3]} {CURRENCY} ➩ {top_ten_rises[i][2]} {CURRENCY}')
             clm1_1.markdown(f'<FONT COLOR="#ff6961"> + {top_ten_rises[i][0]} % </FONT>', unsafe_allow_html=True)
 
             ### FALLS ###
@@ -258,13 +259,12 @@ def app(shop: str) -> None:
             clm2_0.image(top_ten_rises[j][4], width=140)
             clm2_1.write('-----------------------------------------------------------------------')
             clm2_1.write(f'{top_ten_rises[j][1]}')
-            clm2_1.write(f'{top_ten_rises[j][3]}€ ➩ {top_ten_rises[j][2]}€')
+            clm2_1.write(f'{top_ten_rises[j][3]} {CURRENCY} ➩ {top_ten_rises[j][2]} {CURRENCY}')
             clm2_1.markdown(f'<FONT COLOR="#42d6a4"> - {top_ten_rises[j][0]} % </FONT>', unsafe_allow_html=True)
 
             ### BORDER ###
             for i in range(8):
                 border.markdown('┃')
-
 
     def placeholder():
         st.write(' ')
@@ -272,7 +272,7 @@ def app(shop: str) -> None:
         st.write(' ')
 
     def run():
-        st.title(SHOP.capitalize())
+        st.title(SHOP.strip('_').capitalize())
         placeholder()
         data_metric()
         placeholder()
