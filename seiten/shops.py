@@ -11,6 +11,7 @@ from operator import itemgetter
 def app(shop: str, currency: str) -> None:
     # VARIABLES
     SHOP = shop
+    SHOP_STR = shop.replace('_', ' ')
     DB = f'Products.db'
     CURRENCY = currency
     IMAGEFILE = f'{SHOP}.png'
@@ -18,16 +19,30 @@ def app(shop: str, currency: str) -> None:
     YESTERDAY = (datetime.now() - timedelta(1)).strftime('%Y-%m-%d')
     COLORS = ['#ff6961', '#ffb480', '#f8f38d', '#42d6a4', '#08cad1', '#59adf6', '#9d94ff', '#c780e8', '#D876AC']
 
-    # Database Conection
+    # Database Connection
     conn = sqlite3.connect(DB)
     cur = conn.cursor()
 
     # Category List
     CATEGORIES = []
-    cur.execute(f"SELECT DISTINCT category FROM {SHOP}")
+    cats_count = []
+    cur.execute(f"SELECT DISTINCT category FROM {SHOP} WHERE date = ?", (TODAY,))
     rows = cur.fetchall()
     for row in rows:
+        cur.execute(f"SELECT COUNT(name) FROM {SHOP} WHERE date = ? AND category = ?", (TODAY, row[0],))
+        count = cur.fetchall()
         CATEGORIES.append(row[0])
+        cats_count.append([row[0], count[0][0]])
+
+    sorted_cats = sorted(cats_count, key=itemgetter(1), reverse=True)
+    if len(sorted_cats) > 9:
+        CATEGORIES_PIE = sorted_cats[:9]
+        rest = 0
+        for cat in sorted_cats[9:]:
+            rest += cat[1]
+        CATEGORIES_PIE.append(['Other Categories', rest])
+    else:
+        CATEGORIES_PIE = sorted_cats
 
     def data_metric():
 
@@ -117,27 +132,26 @@ def app(shop: str, currency: str) -> None:
 
         # Plot pie chart
         labels = [
-            category
-            for category in CATEGORIES
+            category[0]
+            for category in CATEGORIES_PIE
         ]
         sizes = []
-        for category in CATEGORIES:
-            cur.execute(f"SELECT COUNT(name) FROM {SHOP} WHERE date = ? AND category = ?", (TODAY, category,))
-            products_in_category = cur.fetchall()
-            sizes.append(products_in_category[0][0])
+        for category in CATEGORIES_PIE:
+            sizes.append(category[1])
 
-        colors = ['#ff6961', '#ffb480', '#f8f38d', '#42d6a4', '#08cad1', '#59adf6', '#9d94ff', '#c780e8', '#D876AC']
+            colors = ['#ff6961', '#ffb480', '#f8f38d', '#42d6a4', '#08cad1', '#59adf6', '#9d94ff', '#c780e8',
+                      '#D876AC', '#9e5993']
         explode = [
             0.05
-            for i in CATEGORIES
+            for i in CATEGORIES_PIE
         ]
 
         fig, ax = plt.subplots()
 
         ax.pie(
-            sizes, colors=colors, autopct='%1.0f%%', pctdistance=1.13, labeldistance=1.2, startangle=90,
-            textprops=dict(color="black"), wedgeprops={'linewidth': 0.1, 'edgecolor': 'black'}, explode=explode
+            sizes, colors=colors, labeldistance=None, explode=explode
         )
+        labels = [f'{l} - {s} Products' for l, s in zip(labels, sizes)]
         ax.legend(labels=labels, title='Categories', loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
 
         centre_circle = plt.Circle((0, 0), 0.50, fc='white')
@@ -155,10 +169,12 @@ def app(shop: str, currency: str) -> None:
         cur.execute(f"SELECT DISTINCT date FROM {SHOP}")
         dates = cur.fetchall()
 
-        x_axis = [
+        x_axis_unsorted = [
             matplotlib.dates.datestr2num(selected_date[0])
             for selected_date in dates
         ]
+
+        x_axis = sorted(x_axis_unsorted)
 
         y_axis = []
         for selected_date in dates:
@@ -167,18 +183,15 @@ def app(shop: str, currency: str) -> None:
             if sum_prices[0][0] and sum_prices[0][1] is not None:
                 y_axis.append(float(round(sum_prices[0][0] / sum_prices[0][1], 2)))
 
-
         # Plot line chart
         fig, ax = plt.subplots()
 
-        ax.plot_date(x_axis, y_axis, color='#ff6961')
-        ax.scatter(x_axis, y_axis, color='#ffb480')
+        ax.fill_between(x_axis, y_axis, color='#ffb480')
         ax.axis([None, None, 0, max(y_axis) + 1])
 
         plt.xticks([])
         plt.xlabel('Time')
         plt.ylabel(f'Price in {CURRENCY}')
-        plt.fill_between(x_axis, y_axis, color='#ffb480')
 
         clm1.pyplot(fig, transparent=True)
 
@@ -187,22 +200,26 @@ def app(shop: str, currency: str) -> None:
         clm2.write(' ')
 
         y_axis = []
-        for category in CATEGORIES:
+        if len(CATEGORIES_PIE) > 9:
+            avg_cat = CATEGORIES_PIE[:9]
+        else:
+            avg_cat = CATEGORIES_PIE
+        for category in CATEGORIES_PIE:
             cur.execute(f"SELECT SUM(price), COUNT(name) FROM {SHOP} WHERE category = ? AND date = ?",
-                        (category, TODAY))
+                        (category[0], TODAY))
             prices_and_count = cur.fetchall()
 
             if prices_and_count[0][0] and prices_and_count[0][1] is not None:
                 y_axis.append(round(prices_and_count[0][0] / prices_and_count[0][1], 2))
 
         fig, ax = plt.subplots()
-        #ax.barh(CATEGORIES, y_axis, color=COLORS)
+        ax.barh([c[0] for c in avg_cat], y_axis, color=COLORS)
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
         ax.spines['left'].set_visible(False)
         plt.setp(ax.get_yticklabels(), fontsize=10, rotation='horizontal')
-        plt.xlabel('Price in EUR')
+        plt.xlabel(f'Price in {CURRENCY}')
         clm2.pyplot(fig, transparent=True)
 
     def statistics_3():
@@ -260,7 +277,7 @@ def app(shop: str, currency: str) -> None:
             clm2_1.write('-----------------------------------------------------------------------')
             clm2_1.write(f'{top_ten_rises[j][1]}')
             clm2_1.write(f'{top_ten_rises[j][3]} {CURRENCY} ➩ {top_ten_rises[j][2]} {CURRENCY}')
-            clm2_1.markdown(f'<FONT COLOR="#42d6a4"> - {top_ten_rises[j][0]} % </FONT>', unsafe_allow_html=True)
+            clm2_1.markdown(f'<FONT COLOR="#42d6a4"> {top_ten_rises[j][0]} % </FONT>', unsafe_allow_html=True)
 
             ### BORDER ###
             for i in range(8):
@@ -272,7 +289,7 @@ def app(shop: str, currency: str) -> None:
         st.write(' ')
 
     def run():
-        st.title(SHOP.strip('_').capitalize())
+        st.title(SHOP_STR.capitalize())
         placeholder()
         data_metric()
         placeholder()

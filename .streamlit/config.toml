@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#464646"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#E4E4E4"
+textColor = "#464646"
+font = "IBM Plex Mono"

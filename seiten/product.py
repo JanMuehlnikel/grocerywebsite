@@ -3,9 +3,20 @@ import sqlite3
 from matplotlib import pyplot as plt
 import matplotlib.dates
 from datetime import date
+from operator import itemgetter
 
 TODAY = date.today().strftime('%Y-%m-%d')
 DB = f'Products.db'
+
+
+def remove_duplicates(l: list) -> list:
+    l2 = []
+    l3 = []
+    for element in l:
+        if element[0] not in l3:
+            l2.append([element[0], element[1]])
+            l3.append(element[0])
+    return l2
 
 
 def app(product: str, shop: str, currency: str) -> None:
@@ -41,28 +52,31 @@ def app(product: str, shop: str, currency: str) -> None:
 
         # Line graph price
         # Get Data
-        cur.execute(f"SELECT price, date FROM {shop} WHERE name = ?", (product,))
+        cur.execute(f"SELECT DISTINCT price, date FROM {shop} WHERE name = ?", (product,))
         product_data = cur.fetchall()
 
         # DATES
+        axis_unsorted = [[p_data[1], p_data[0]] for p_data in product_data]
+        axis = remove_duplicates(sorted(axis_unsorted, key=itemgetter(0)))
+
+        st.write(axis)
         x_axis = [
-            matplotlib.dates.datestr2num(data[1])
-            for data in product_data
+            x[0]
+            for x in axis
         ]
         # PRICES
         y_axis = [
-            float(data[0])
-            for data in product_data
+            float(y[1])
+            for y in axis
         ]
 
         # Plot line chart
         fig, ax = plt.subplots()
 
-        ax.plot(x_axis, y_axis, color='#59adf6')
         ax.axis([None, None, 0, max(y_axis) + 1])
+        ax.fill_between(x_axis, y_axis, color='#59adf6')
 
         plt.xticks([])
-        plt.fill_between(x_axis, y_axis, color='#59adf6')
         plt.xlabel('Time')
         plt.ylabel('Price in EUR')
         clm1.pyplot(fig, transparent=True)
@@ -77,5 +91,3 @@ def app(product: str, shop: str, currency: str) -> None:
         clm2.metric(f'Average ↭', f'{round(max_min[0][2], 2)} {currency}')
 
     statistics1()
-
-

@@ -5,7 +5,7 @@ import seiten.shops as shops
 import seiten.home as home
 
 # page config
-st.set_page_config(f'Dashboard', layout="wide")
+st.set_page_config(f'Dashboard', layout="wide", page_icon='icon.png')
 
 def menu():
     selected = option_menu(
@@ -17,7 +17,7 @@ def menu():
         orientation='horizontal',
         styles={
             "container": {"padding": "0!important", "background-color": "#grey"},
-            "icon": {"color": "#ff6961", "font-size": "25px"},
+            "icon": {"color": "#E4E4E4", "font-size": "25px"},
             "nav-link": {
                 "font-size": "25px",
                 "text-align": "left",
