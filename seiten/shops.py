@@ -1,6 +1,6 @@
 import streamlit as st
 from matplotlib import pyplot as plt
-from datetime import datetime, timedelta, date
+from datetime import timedelta, date
 import matplotlib.dates
 import seiten.product as product_site
 from PIL import Image
@@ -15,9 +15,12 @@ def app(shop: str, currency: str) -> None:
     DB = f'Products.db'
     CURRENCY = currency
     IMAGEFILE = f'{SHOP}.png'
-    TODAY = date.today().strftime('%Y-%m-%d')
-    YESTERDAY = (datetime.now() - timedelta(1)).strftime('%Y-%m-%d')
     COLORS = ['#ff6961', '#ffb480', '#f8f38d', '#42d6a4', '#08cad1', '#59adf6', '#9d94ff', '#c780e8', '#D876AC']
+
+    # DATES
+    TODAY = date.today()
+    THIS_MONDAY = TODAY - timedelta(days=TODAY.weekday())
+    LAST_MONDAY = TODAY - timedelta(days=TODAY.weekday(), weeks=1)
 
     # Database Connection
     conn = sqlite3.connect(DB)
@@ -26,10 +29,10 @@ def app(shop: str, currency: str) -> None:
     # Category List
     CATEGORIES = []
     cats_count = []
-    cur.execute(f"SELECT DISTINCT category FROM {SHOP} WHERE date = ?", (TODAY,))
+    cur.execute(f"SELECT DISTINCT label FROM {SHOP} WHERE date = ?", (THIS_MONDAY,))
     rows = cur.fetchall()
     for row in rows:
-        cur.execute(f"SELECT COUNT(name) FROM {SHOP} WHERE date = ? AND category = ?", (TODAY, row[0],))
+        cur.execute(f"SELECT COUNT(name) FROM {SHOP} WHERE date = ? AND label = ?", (THIS_MONDAY, row[0],))
         count = cur.fetchall()
         CATEGORIES.append(row[0])
         cats_count.append([row[0], count[0][0]])
@@ -45,7 +48,6 @@ def app(shop: str, currency: str) -> None:
         CATEGORIES_PIE = sorted_cats
 
     def data_metric():
-
         def compare(day):
             cur.execute(f"SELECT COUNT(name) FROM {SHOP} WHERE date = ?", (day,))
             number_products = cur.fetchall()
@@ -53,7 +55,7 @@ def app(shop: str, currency: str) -> None:
             cur.execute(f"SELECT SUM(price) FROM {SHOP} WHERE date = ?", (day,))
             sum_price = cur.fetchall()
 
-            cur.execute(f"SELECT price, name FROM {SHOP} WHERE date = ?", (TODAY,))
+            cur.execute(f"SELECT price, name FROM {SHOP} WHERE date = ?", (THIS_MONDAY,))
             prices_td = cur.fetchall()
 
             changes = 0
@@ -71,11 +73,11 @@ def app(shop: str, currency: str) -> None:
             except:
                 return [1, 1, 1]
 
-        number_products_today = compare(TODAY)[0]
-        number_products_yesterday = compare(YESTERDAY)[0]
-        avg_price_today = compare(TODAY)[1]
-        avg_price_yesterday = compare(YESTERDAY)[1]
-        changes_today = compare(TODAY)[2]
+        number_products_today = compare(THIS_MONDAY)[0]
+        number_products_yesterday = compare(LAST_MONDAY)[0]
+        avg_price_today = compare(THIS_MONDAY)[1]
+        avg_price_yesterday = compare(LAST_MONDAY)[1]
+        changes_today = compare(THIS_MONDAY)[2]
 
         # WRITE COLUMNS
         products, avg_price, change = st.columns(3)
@@ -86,7 +88,7 @@ def app(shop: str, currency: str) -> None:
         avg_price.metric(f'Average Price', f'{avg_price_today} {CURRENCY}',
                          f'{round(((avg_price_today - avg_price_yesterday) / avg_price_yesterday) * 100, 2)} %')
 
-        change.metric(f'Price Changes', f'{changes_today} changes', f'since {YESTERDAY}')
+        change.metric(f'Price Changes', f'{changes_today} changes', f'since {LAST_MONDAY}')
 
     def products_table():
         # Sidebar
@@ -100,7 +102,7 @@ def app(shop: str, currency: str) -> None:
 
         sb_category = clm1.selectbox('Select category', CATEGORIES, index=0)
 
-        cur.execute(f"SELECT name, price FROM {SHOP} WHERE category = ? AND date = ?", (sb_category, TODAY,))
+        cur.execute(f"SELECT name, price FROM {SHOP} WHERE label = ? AND date = ?", (sb_category, THIS_MONDAY,))
         products = cur.fetchall()
         selection = [
             product[0]
@@ -121,10 +123,10 @@ def app(shop: str, currency: str) -> None:
     def statistics_1():
         space, clm1, space, clm2, space = st.columns((1, 5, 1, 5, 1))
 
-        clm1.title('Map')
+        clm1.title(f'{SHOP.upper().replace("_", " ")}')
         clm1.write(' ')
         image = Image.open(IMAGEFILE)
-        clm1.image(image, f'All {SHOP.capitalize()} shops in a certain area', width=300)
+        clm1.image(image, width=400)
 
         ### CATEGROIES PIE CHART ###
         clm2.title('Categories')
@@ -162,126 +164,212 @@ def app(shop: str, currency: str) -> None:
 
     def statistics_2():
         space, clm1, space, clm2, space = st.columns((1, 5, 1, 5, 1))
-        ### Line Graph Average Price ###
-        clm1.title('Average Price')
-        clm1.write(' ')
+        space, clm1_1, space, clm2_1, space, clm2_2, space = st.columns((1, 11, 1, 5, 1, 5, 1))
 
-        cur.execute(f"SELECT DISTINCT date FROM {SHOP}")
-        dates = cur.fetchall()
+        def avg():
+            ### AVG Prices per Categories ###
+            clm1.title('Average Price')
+            clm1.write(' ')
 
-        x_axis_unsorted = [
-            matplotlib.dates.datestr2num(selected_date[0])
-            for selected_date in dates
-        ]
+            cur.execute(f"SELECT DISTINCT label FROM {SHOP}")
+            labels = cur.fetchall()
+            labels_list = ['Total - All Categories']
+            for label in labels:
+                labels_list.append(label[0])
+            select = clm1.selectbox('Select a category', labels_list)
 
-        x_axis = sorted(x_axis_unsorted)
+            clm1_1.write(' ')
+            clm1_1.write(' ')
+            clm1_1.write(' ')
 
-        y_axis = []
-        for selected_date in dates:
-            cur.execute(f"SELECT SUM(price), COUNT(name) FROM {SHOP} WHERE date = ?", (selected_date[0],))
-            sum_prices = cur.fetchall()
-            if sum_prices[0][0] and sum_prices[0][1] is not None:
-                y_axis.append(float(round(sum_prices[0][0] / sum_prices[0][1], 2)))
+            if select != 'Total - All Categories':
+                cur.execute(f"SELECT DISTINCT date FROM {SHOP} WHERE label = ?", (select,))
+                dates = cur.fetchall()
 
-        # Plot line chart
-        fig, ax = plt.subplots()
+                x_axis_unsorted = [
+                    selected_date[0]
+                    for selected_date in dates
+                ]
+                x_axis = sorted(x_axis_unsorted)
 
-        ax.fill_between(x_axis, y_axis, color='#ffb480')
-        ax.axis([None, None, 0, max(y_axis) + 1])
+                y_axis = []
+                for selected_date in x_axis:
+                    cur.execute(f"SELECT AVG(price) FROM {SHOP} WHERE date = ? AND label = ?", (selected_date, select,))
+                    avg_price = cur.fetchall()
+                    y_axis.append(avg_price[0][0])
+            else:
+                cur.execute(f"SELECT DISTINCT date FROM {SHOP}")
+                dates = cur.fetchall()
+                x_axis_unsorted = [
+                    selected_date[0]
+                    for selected_date in dates
+                ]
+                x_axis = sorted(x_axis_unsorted)
 
-        plt.xticks([])
-        plt.xlabel('Time')
-        plt.ylabel(f'Price in {CURRENCY}')
+                y_axis = []
+                for selected_date in x_axis:
+                    cur.execute(f"SELECT AVG(price) FROM {SHOP} WHERE date = ?", (selected_date,))
+                    avg_price = cur.fetchall()
+                    y_axis.append(avg_price[0][0])
 
-        clm1.pyplot(fig, transparent=True)
+            # Plot line chart
+            fig1, ax1 = plt.subplots()
 
-        ### Prices and Categories ###
-        clm2.title('Average Price per Category')
-        clm2.write(' ')
+            ax1.fill_between(x_axis, y_axis, color=COLORS[0])
+            ax1.axis([None, None, 0, max(y_axis) + 1])
 
-        y_axis = []
-        if len(CATEGORIES_PIE) > 9:
-            avg_cat = CATEGORIES_PIE[:9]
-        else:
-            avg_cat = CATEGORIES_PIE
-        for category in CATEGORIES_PIE:
-            cur.execute(f"SELECT SUM(price), COUNT(name) FROM {SHOP} WHERE category = ? AND date = ?",
-                        (category[0], TODAY))
-            prices_and_count = cur.fetchall()
+            plt.xticks([])
+            plt.xlabel('Time')
+            plt.ylabel(f'Price in {CURRENCY}')
 
-            if prices_and_count[0][0] and prices_and_count[0][1] is not None:
-                y_axis.append(round(prices_and_count[0][0] / prices_and_count[0][1], 2))
+            clm1_1.pyplot(fig1, transparent=True)
 
-        fig, ax = plt.subplots()
-        ax.barh([c[0] for c in avg_cat], y_axis, color=COLORS)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['bottom'].set_visible(False)
-        ax.spines['left'].set_visible(False)
-        plt.setp(ax.get_yticklabels(), fontsize=10, rotation='horizontal')
-        plt.xlabel(f'Price in {CURRENCY}')
-        clm2.pyplot(fig, transparent=True)
+        def one_to_watch():
+            clm2.title('Ones To Watch')
+            clm2.write(' ')
+            otw = ['Categories to watch 📋',  'Products - Price Rise 📈', 'Products - Price Fall 📉', 'Out Of Portfolio ⬅', 'New In Portfolio ➡']
 
-    def statistics_3():
-        # products with most relative price rise and fall
-        # date to compare
-        # three_month_ago = (datetime.now() - timedelta(1)).strftime('%Y-%m-%d')
-        three_month_ago = '2022-03-28'
+            select = clm2.selectbox('Select', otw)
 
-        # DB Cnnection
-        cur.execute(f"SELECT price, name FROM {SHOP} WHERE date = ?", (three_month_ago,))
-        products_then = cur.fetchall()
+            def categories():
+                unsorted_cats = []
+                cur.execute(f"SELECT DISTINCT label FROM {SHOP}")
+                labels = cur.fetchall()
+                for label in labels:
+                    cur.execute(f"SELECT avg(price) FROM {SHOP} WHERE label = ? AND date = ?",
+                                (label[0], str(THIS_MONDAY),))
+                    price_now = cur.fetchall()
 
-        # Iterate through all products and select 10 with highest rise
-        rises = []
-        for product_then in products_then:
-            try:
-                cur.execute(f"SELECT price, image FROM {SHOP} WHERE date = ? AND name = ?", (TODAY, product_then[1],))
-                product_today = cur.fetchall()
+                    cur.execute(f"SELECT avg(price) FROM {SHOP} WHERE label = ? AND date = ?",
+                                (label[0], str(LAST_MONDAY),))
+                    price_then = cur.fetchall()
 
-                price_rise = round(
-                    (((float(product_today[0][0]) - float(product_then[0])) / float(product_then[0])) * 100), 2)
+                    try:
+                        inflation = round(((price_now[0][0] - price_then[0][0]) / price_then[0][0]) * 100, 2)
+                    except:
+                        inflation = 0
 
-                # Price rise / Name / Price today / Price then / Image
-                rises.append([price_rise, product_then[1], product_today[0][0], product_then[0], product_today[0][1]])
+                    unsorted_cats.append([abs(inflation), label[0], inflation])
 
-            except:
-                continue
+                cats = sorted(unsorted_cats, key=itemgetter(0))
 
-        top_ten_rises = sorted(rises, key=itemgetter(0))
-        space, clm1, space, clm2, space = st.columns((1, 5, 1, 5, 1))
+                for i in range(-1, -11, -1):
+                    if i >= -5:
+                        clm2_1.write('-----------------------------------------------------------------------')
+                        clm2_1.write(f'{i * -1}: {cats[i][1][5:]}')
+                        if cats[i][2] >= 0:
+                            clm2_1.markdown(f'<FONT COLOR="#ff6961">+ {cats[i][2]} %</FONT>', unsafe_allow_html=True)
+                        else:
+                            clm2_1.markdown(f'<FONT COLOR="#42d6a4">{cats[i][2]} %</FONT>', unsafe_allow_html=True)
+                    else:
+                        clm2_2.write('-----------------------------------------------------------------------')
+                        clm2_2.write(f'{i * -1}: {cats[i][1][5:]}')
+                        if cats[i][2] >= 0:
+                            clm2_2.markdown(f'<FONT COLOR="#ff6961">+ {cats[i][2]} %</FONT>', unsafe_allow_html=True)
+                        else:
+                            clm2_2.markdown(f'<FONT COLOR="#42d6a4">{cats[i][2]} %</FONT>', unsafe_allow_html=True)
 
-        clm1.header('Top 5 - Relative Price Rise 📈')
-        clm1.caption(f'➠ since {three_month_ago}')
-        clm2.header('Top 5 - Relative Price Fall 📉')
-        clm2.caption(f'➠ since {three_month_ago}')
+            def rises_falls(status: str):
+                # products with most relative price rise and fall
+                DATE_TO_COMPARE = LAST_MONDAY
+                # DB Cnnection
+                cur.execute(f"SELECT price, name FROM {SHOP} WHERE date = ?", (DATE_TO_COMPARE,))
+                products_then = cur.fetchall()
 
-        for j in range(5):
-            i = -j - 1
-            space, clm1_0, clm1_1, border, clm2_0, clm2_1, space = st.columns((1, 5, 5, 1, 5, 5, 1))
+                # Iterate through all products and select 10 with highest rise
+                rises = []
+                for product_then in products_then:
+                    try:
+                        cur.execute(f"SELECT price, image FROM {SHOP} WHERE date = ? AND name = ?",
+                                    (THIS_MONDAY, product_then[1],))
+                        product_today = cur.fetchall()
 
-            ### RISES ###
-            clm1_0.write('-----------------------------------------------------------------------')
-            clm1_0.write(' ')
-            clm1_0.image(top_ten_rises[i][4], width=140)
-            clm1_1.write('-----------------------------------------------------------------------')
-            clm1_1.write(f'{top_ten_rises[i][1]}')
-            clm1_1.write(f'{top_ten_rises[i][3]} {CURRENCY} ➩ {top_ten_rises[i][2]} {CURRENCY}')
-            clm1_1.markdown(f'<FONT COLOR="#ff6961"> + {top_ten_rises[i][0]} % </FONT>', unsafe_allow_html=True)
+                        price_rise = round(
+                            (((float(product_today[0][0]) - float(product_then[0])) / float(product_then[0])) * 100), 2)
 
-            ### FALLS ###
-            j = abs(i) + 1
-            clm2_0.write('-----------------------------------------------------------------------')
-            clm2_0.write(' ')
-            clm2_0.image(top_ten_rises[j][4], width=140)
-            clm2_1.write('-----------------------------------------------------------------------')
-            clm2_1.write(f'{top_ten_rises[j][1]}')
-            clm2_1.write(f'{top_ten_rises[j][3]} {CURRENCY} ➩ {top_ten_rises[j][2]} {CURRENCY}')
-            clm2_1.markdown(f'<FONT COLOR="#42d6a4"> {top_ten_rises[j][0]} % </FONT>', unsafe_allow_html=True)
+                        # Price rise / Name / Price today / Price then / Image
+                        rises.append(
+                            [price_rise, product_then[1], product_today[0][0], product_then[0], product_today[0][1]])
 
-            ### BORDER ###
-            for i in range(8):
-                border.markdown('┃')
+                    except:
+                        continue
+
+                top_ten_rises = sorted(rises, key=itemgetter(0))
+
+                ### RISES ###
+                if status == 'rise':
+                    for j in range(5):
+                        i = -j - 1
+
+                        clm2_1.write('-----------------------------------------------------------------------')
+                        clm2_1.image(top_ten_rises[i][4], width=67)
+                        clm2_2.write('-----------------------------------------------------------------------')
+                        clm2_2.write(f'{top_ten_rises[i][1]}')
+                        clm2_2.markdown(f'{top_ten_rises[i][3]} {CURRENCY} ➩ {top_ten_rises[i][2]} {CURRENCY} '
+                                        f'(<FONT COLOR="#ff6961">+ {top_ten_rises[i][0]} %</FONT>)',
+                                        unsafe_allow_html=True)
+
+                ### FALLS ###
+                elif status == 'fall':
+                    for j in range(0, 5):
+                        clm2_1.caption('-----------------------------------------------------------------------')
+                        clm2_1.image(top_ten_rises[j][4], width=67)
+                        clm2_2.caption('-----------------------------------------------------------------------')
+                        clm2_2.write(f'{top_ten_rises[j][1]}')
+                        clm2_2.markdown(f'{top_ten_rises[j][3]} {CURRENCY} ➩ {top_ten_rises[j][2]} {CURRENCY} '
+                                        f'(<FONT COLOR="#42d6a4">{top_ten_rises[j][0]} %</FONT>)',
+                                        unsafe_allow_html=True)
+
+            def portfolio(status: str):
+                if status == 'new':
+                    base_date = LAST_MONDAY
+                    compare_date = THIS_MONDAY
+                    st = 'new products in portfolio'
+                elif status == 'out':
+                    base_date = THIS_MONDAY
+                    compare_date = LAST_MONDAY
+                    st = 'products out of portfolio'
+
+                compare_list = []
+                base_list = []
+                for c in CATEGORIES:
+                    cur.execute(f"SELECT COUNT(label) FROM {SHOP} WHERE label = ? AND date = ?", (c, base_date,))
+                    c1_sum = cur.fetchall()
+                    base_list.append([c1_sum[0][0], c])
+
+                    cur.execute(f"SELECT COUNT(label) FROM {SHOP} WHERE label = ? AND date = ?", (c, compare_date,))
+                    c2_sum = cur.fetchall()
+                    compare_list.append(c2_sum[0][0])
+
+                result_list = []
+                for i in range(len(base_list)):
+                    result_list.append([base_list[i][0] - compare_list[i], base_list[i][1]])
+
+                sorted_results = sorted(result_list, key=itemgetter(0))
+
+                for i in range(-1, -11, -1):
+                    if i > -6:
+                        clm2_1.write('-----------------------------------------------------------------------')
+                        clm2_1.write(f'{sorted_results[i][1][5:]}')
+                        clm2_1.caption(f'➟ {sorted_results[i][0]} {st}')
+                    else:
+                        clm2_2.write('-----------------------------------------------------------------------')
+                        clm2_2.write(f'{sorted_results[i][1][5:]}')
+                        clm2_2.caption(f'➟ {sorted_results[i][0]} {st}')
+
+            if select == 'Categories to watch 📋':
+                categories()
+            elif select == 'Products - Price Rise 📈':
+                rises_falls('rise')
+            elif select == 'Products - Price Fall 📉':
+                rises_falls('fall')
+            elif select == 'Out Of Portfolio ⬅':
+                portfolio('out')
+            elif select == 'New In Portfolio ➡':
+                portfolio('new')
+
+        avg()
+        one_to_watch()
 
     def placeholder():
         st.write(' ')
@@ -289,7 +377,7 @@ def app(shop: str, currency: str) -> None:
         st.write(' ')
 
     def run():
-        st.title(SHOP_STR.capitalize())
+        st.header(f'DASHBOARD - {SHOP_STR.upper().replace("_", " ")}')
         placeholder()
         data_metric()
         placeholder()
@@ -297,7 +385,8 @@ def app(shop: str, currency: str) -> None:
         placeholder()
         statistics_2()
         placeholder()
-        statistics_3()
         products_table()
+        placeholder()
+        # statistics_4()
 
     run()

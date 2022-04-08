@@ -1,11 +1,12 @@
 import streamlit as st
 import sqlite3
 from matplotlib import pyplot as plt
-import matplotlib.dates
-from datetime import date
+from datetime import timedelta, date
 from operator import itemgetter
 
-TODAY = date.today().strftime('%Y-%m-%d')
+TODAY = date.today()
+THIS_MONDAY = TODAY - timedelta(days=TODAY.weekday())
+LAST_MONDAY = TODAY - timedelta(days=TODAY.weekday(), weeks=1)
 DB = f'Products.db'
 
 
@@ -34,7 +35,7 @@ def app(product: str, shop: str, currency: str) -> None:
     space, clm1, clm2, space = st.columns((1, 5, 5, 1))
 
     # Get Data from DB
-    cur.execute(f"SELECT name, price, image FROM {shop} WHERE name = ? AND date = ?", (product, TODAY,))
+    cur.execute(f"SELECT name, price, image FROM {shop} WHERE name = ? AND date = ?", (product, THIS_MONDAY,))
     data = cur.fetchall()
 
     # Write Data on Website
@@ -59,7 +60,6 @@ def app(product: str, shop: str, currency: str) -> None:
         axis_unsorted = [[p_data[1], p_data[0]] for p_data in product_data]
         axis = remove_duplicates(sorted(axis_unsorted, key=itemgetter(0)))
 
-        st.write(axis)
         x_axis = [
             x[0]
             for x in axis
