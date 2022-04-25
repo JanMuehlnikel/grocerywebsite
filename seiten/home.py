@@ -6,7 +6,7 @@ from PIL import Image
 
 
 def app():
-    st.header('HOME')
+    st.title('HOME')
     # Database Connection
     DB = f'Products.db'
     conn = sqlite3.connect(DB)
@@ -119,9 +119,26 @@ def app():
     def information():
         space, clm1, space, clm2 = st.columns((1, 7, 1, 4))
         with clm1:
-            st.title('Intention / Information')
+            st.header('Intention / Information')
+            st.subheader('Idea:')
+            st.write('Often you can see, that inflation and crisis are two things that heavily relate to each other. '
+                     'The general idea is that you can indicate a crisis before they get catastrophes with a inflation rate that reflects price changes '
+                     'over a shorter period than usual. Especially on groceries you can see how prices rise, when there is a crisis. '
+                     'Therefore I scraped some supermarkets and selected data to cover products, prices and other important information '
+                     'to calculate the food inflation. Within the same process I categorized all products with a model '
+                     'to make inflation comparable, by categories, that go further than the usual supermarket '
+                     'categories. Now it is possible to compare the inflation between different supermarkets over a shorter period, but also between '
+                     'the different categories.')
+            st.subheader('Information:')
+            st.write("Scraped shops:")
+            st.write('  - Aldi Süd - Germany')
+            st.write("  - Carrefour Cote D'Ivore - Cote D'Ivoire")
+            st.write('Updates every monday')
+            st.write('Inflation is calculated weekly')
+
+            st.write(" ")
             image = Image.open('p1.png')
-            st.image(image, f'', width=500)
+            st.image(image, f'', width=600)
 
             st.write('')
         # WARN SYSTEM
@@ -153,7 +170,7 @@ def app():
                     except:
                         inflation = 0
 
-                    if inflation > 0:
+                    if 0 < inflation < 500:
                         warnings.append([inflation, label[0], shop])
 
             sorted_warnings = sorted(warnings, key=itemgetter(0))
